@@ -499,70 +499,70 @@
         </p>
         <div class="image-gallery">
             <div class="gallery-item">
-                <img src="docs/images/city_road.jpg" alt="城市道路" 
-                     onerror="this.src='https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=640'">
+                <img id="gallery-city_road" alt="城市道路">
                 <div class="gallery-overlay">
                     <h4>城市道路</h4>
-                    <p>检测到 5 辆车 | 稳定跟踪</p>
+                    <p>检测到 10 辆车 | 白天场景</p>
                 </div>
             </div>
             <div class="gallery-item">
-                <img src="docs/images/street.jpg" alt="街道"
-                     onerror="this.src='https://images.unsplash.com/photo-1533106497176-45ae19e68ba2?w=640'">
+                <img id="gallery-night_traffic" alt="夜间交通">
+                <div class="gallery-overlay">
+                    <h4>夜间交通</h4>
+                    <p>检测到 8 辆车 | 夜景</p>
+                </div>
+            </div>
+            <div class="gallery-item">
+                <img id="gallery-highway" alt="高速公路">
+                <div class="gallery-overlay">
+                    <h4>高速公路</h4>
+                    <p>检测到 5 辆车 | 高速</p>
+                </div>
+            </div>
+            <div class="gallery-item">
+                <img id="gallery-motorway" alt="收费高速">
+                <div class="gallery-overlay">
+                    <h4>收费高速</h4>
+                    <p>检测到 6 辆车 | 收费口</p>
+                </div>
+            </div>
+            <div class="gallery-item">
+                <img id="gallery-street" alt="街道">
                 <div class="gallery-overlay">
                     <h4>街道</h4>
-                    <p>检测到 4 辆车 | 复杂场景</p>
+                    <p>检测到 4 辆车 | 城区</p>
                 </div>
             </div>
             <div class="gallery-item">
-                <img src="docs/images/truck.jpg" alt="卡车"
-                     onerror="this.src='https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=640'">
-                <div class="gallery-overlay">
-                    <h4>卡车</h4>
-                    <p>Truck 96.2% | 大目标</p>
-                </div>
-            </div>
-            <div class="gallery-item">
-                <img src="docs/images/bus.jpg" alt="公交车"
-                     onerror="this.src='https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=640'">
+                <img id="gallery-bus" alt="公交车">
                 <div class="gallery-overlay">
                     <h4>公交车</h4>
-                    <p>Bus 95.5% | 多目标</p>
+                    <p>Bus 95.5% | 大目标</p>
                 </div>
             </div>
             <div class="gallery-item">
-                <img src="docs/images/sport_car.jpg" alt="跑车"
-                     onerror="this.src='https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=640'">
+                <img id="gallery-truck" alt="卡车">
+                <div class="gallery-overlay">
+                    <h4>卡车</h4>
+                    <p>Truck 96.2% | 货运</p>
+                </div>
+            </div>
+            <div class="gallery-item">
+                <img id="gallery-sport_car" alt="跑车">
                 <div class="gallery-overlay">
                     <h4>跑车</h4>
                     <p>Car 97.8% | 高速运动</p>
                 </div>
             </div>
-            <div class="gallery-item">
-                <img src="docs/images/parking.jpg" alt="停车场"
-                     onerror="this.src='https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=640'">
-                <div class="gallery-overlay">
-                    <h4>停车场</h4>
-                    <p>检测到 3 辆车 | 静止目标</p>
-                </div>
-            </div>
-            <div class="gallery-item">
-                <img src="docs/images/real_3.jpg" alt="交通场景1"
-                     onerror="this.src='https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=640'">
-                <div class="gallery-overlay">
-                    <h4>交通场景</h4>
-                    <p>混合交通 | 实时检测</p>
-                </div>
-            </div>
-            <div class="gallery-item">
-                <img src="docs/images/real_4.jpg" alt="综合场景"
-                     onerror="this.src='https://images.unsplash.com/photo-1517080817486-cb44a49af6ac?w=640'">
-                <div class="gallery-overlay">
-                    <h4>综合场景</h4>
-                    <p>多类型车辆混合</p>
-                </div>
-            </div>
         </div>
+        <script src="images_base64.js"></script>
+        <script>
+            // 加载真实图片
+            for (const [name, src] of Object.entries(BASE64_IMAGES)) {
+                const img = document.getElementById('gallery-' + name);
+                if (img) img.src = src;
+            }
+        </script>
     </section>
 
     <!-- Architecture -->
