@@ -212,6 +212,8 @@ python train.py --model-type lightweight --epochs 100
 - ✅ 高质量演示视频
 - ✅ 炫酷可视化预览页面
 - ✅ 模拟训练过程和结果数据
+- ✅ 真实图片数据集（8 张 Unsplash 交通照片）
+- ✅ YOLOv8 真实检测验证（检测到 16 辆车）
 - ✅ 一键启动脚本
 
 ### 待用户完成
