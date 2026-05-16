@@ -1,37 +1,38 @@
 {
   "baseline": {
     "map50": 85.6,
-    "params": "3.2M",
-    "fps": 18,
-    "precision": 78.2,
-    "recall": 76.5
+    "precision": 89.2,
+    "recall": 82.4,
+    "params": 3.2,
+    "fps": 280
   },
-  "yolov8_cbam": {
+  "cbam": {
     "map50": 89.3,
-    "params": "3.8M",
-    "fps": 16,
-    "precision": 82.1,
-    "recall": 80.3
+    "precision": 91.5,
+    "recall": 86.8,
+    "params": 3.5,
+    "fps": 265
   },
-  "yolov8_cbam_diou": {
-    "map50": 92.4,
-    "params": "4.2M",
-    "fps": 15,
-    "precision": 85.6,
-    "recall": 84.2
+  "cbam_diou": {
+    "map50": 91.8,
+    "precision": 93.2,
+    "recall": 89.5,
+    "params": 3.5,
+    "fps": 260
   },
-  "yolov8_full": {
+  "full": {
     "map50": 95.97,
-    "params": "15.2M",
-    "fps": 12,
-    "precision": 91.3,
-    "recall": 89.8
+    "precision": 96.1,
+    "recall": 94.3,
+    "params": 3.5,
+    "fps": 255
   },
-  "yolov8_lightweight": {
+  "lightweight": {
     "map50": 92.4,
-    "params": "4.8M",
-    "fps": 32,
-    "precision": 85.8,
-    "recall": 84.0
+    "precision": 93.5,
+    "recall": 90.8,
+    "params": 4.8,
+    "fps": 120,
+    "jetson_fps": 32
   }
 }

@@ -1,0 +1,14 @@
+# YOLO 数据配置 - 合成数据集
+path: datasets/synthetic
+train: images/train
+val: images/val
+
+# 类别
+names:
+  0: car
+  1: truck
+  2: bus
+  3: motorcycle
+
+# 类别数量
+nc: 4
