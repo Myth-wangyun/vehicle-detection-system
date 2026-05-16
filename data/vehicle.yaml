@@ -1,0 +1,21 @@
+# 车辆检测数据集配置文件
+# 适用于YOLOv8训练
+
+# 数据集路径
+path: ./data/vehicle_dataset  # 数据集根目录
+train: images/train  # 训练集图像
+val: images/val      # 验证集图像
+test: images/test    # 测试集图像
+
+# 类别名称
+names:
+  0: car        # 轿车
+  1: truck      # 卡车
+  2: bus        # 公交车
+  3: motorcycle # 摩托车
+
+# 类别数量
+nc: 4
+
+# 数据增强（YOLOv8默认启用）
+# 可在训练时通过参数覆盖

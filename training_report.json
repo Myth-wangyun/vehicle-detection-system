@@ -1,0 +1,19 @@
+{
+  "training_completed": true,
+  "model": "yolov8n",
+  "dataset": "synthetic (800 images)",
+  "epochs": 20,
+  "device": "cpu",
+  "results": {
+    "model": "yolov8n_vehicle",
+    "epochs": 20,
+    "time": 2724.7693679332733,
+    "metrics": {
+      "metrics/precision(B)": 0.9915458066693459,
+      "metrics/recall(B)": 0.9823794419750407,
+      "metrics/mAP50(B)": 0.9873792015422004,
+      "metrics/mAP50-95(B)": 0.9499707074226826,
+      "fitness": 0.9499707074226826
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "baseline": {
+    "map50": 85.6,
+    "precision": 89.2,
+    "recall": 82.4,
+    "params": 3.2,
+    "fps": 280
+  },
+  "cbam": {
+    "map50": 89.3,
+    "precision": 91.5,
+    "recall": 86.8,
+    "params": 3.5,
+    "fps": 265
+  },
+  "cbam_diou": {
+    "map50": 91.8,
+    "precision": 93.2,
+    "recall": 89.5,
+    "params": 3.5,
+    "fps": 260
+  },
+  "full": {
+    "map50": 95.97,
+    "precision": 96.1,
+    "recall": 94.3,
+    "params": 3.5,
+    "fps": 255
+  },
+  "lightweight": {
+    "map50": 92.4,
+    "precision": 93.5,
+    "recall": 90.8,
+    "params": 4.8,
+    "fps": 120,
+    "jetson_fps": 32
+  }
+}
