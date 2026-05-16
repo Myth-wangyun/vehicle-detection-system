@@ -2,9 +2,17 @@
 演示脚本
 使用 COCO 预训练 YOLOv8 模型进行车辆检测
 无需额外数据集，直接运行
+支持无头模式：无 GUI 环境自动保存结果到文件
 """
 import os
 import sys
+
+# 检测无头环境并自动配置
+HEADLESS = os.environ.get('DISPLAY', '') == '' or '--headless' in sys.argv
+if HEADLESS:
+    os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+    os.environ['OPENCV_VIDEOIO_DEBUG'] = '1'
+
 import cv2
 import numpy as np
 import time
@@ -302,6 +310,8 @@ def main():
                        help='设备 (cpu/cuda)')
     parser.add_argument('--no-show', action='store_true',
                        help='不显示窗口')
+    parser.add_argument('--headless', action='store_true',
+                       help='无头模式（自动检测无 GUI 环境）')
     args = parser.parse_args()
     
     print("=" * 60)
@@ -309,13 +319,21 @@ def main():
     print("=" * 60)
     print(f"使用 COCO 预训练模型")
     print(f"支持检测: car, truck, bus, motorcycle")
+    
+    # 自动检测无头环境
+    if HEADLESS or args.headless or args.no_show:
+        print("运行模式: 无头模式（输出到文件）")
+        show_window = False
+    else:
+        show_window = True
+    
     print("=" * 60)
     
     # 加载模型
     model = load_model(args.model, args.device)
     
     # 处理视频
-    process_video(args.video, model, show=not args.no_show, conf_threshold=args.conf)
+    process_video(args.video, model, show=show_window, conf_threshold=args.conf)
 
 
 if __name__ == "__main__":
