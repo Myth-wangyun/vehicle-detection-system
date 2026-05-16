@@ -62,10 +62,8 @@ vehicle_detection_system/
 ### 预览链路（Web 预览）
 - **预览页面**: `preview.html` - 炫酷可视化展示页面
 - **预览服务**: Python HTTP 服务器，端口 5000
-- **预览脚本**: 
-  - `scripts/coze-preview-build.sh` - 预览准备
-  - `scripts/coze-preview-run.sh` - 启动预览服务
-- **访问地址**: http://localhost:5000/preview.html
+- **演示视频**: `demo_videos/simulation_output.mp4` - 模拟检测演示
+- **访问地址**: Coze 平台预览区域
 
 ### 本地运行
 ```bash
@@ -75,8 +73,35 @@ bash install.sh
 # 启动 GUI
 python main.py
 
-# 或使用快捷脚本
-bash run.sh
+# 命令行演示（自动检测无头模式）
+python demo.py --headless
+
+# 模拟检测演示（展示完整功能）
+python simulate_detection.py
+```
+
+## 实际情况说明
+
+### 已完成
+- ✅ 核心模块源码（CBAM、DIoU、DeepSORT、速度估算、跨线计数）
+- ✅ PyQt5 GUI 界面
+- ✅ 训练脚本（含数据增强）
+- ✅ 模拟检测演示视频
+- ✅ 炫酷可视化预览页面
+- ✅ 依赖安装完成
+
+### 待用户完成
+- ⏳ 下载 UA-DETRAC 数据集（官方链接已失效，需自行寻找资源）
+- ⏳ 实际训练（需 GPU 环境，训练时间 3-5 小时）
+- ⏳ 论文数据验证（mAP 92.4% 等为目标值，非实测）
+
+### 论文数据说明
+当前展示的 mAP、参数量等数据为 **论文目标值**，非实际训练结果：
+- mAP@0.5 ≥ 92.4%（论文目标）
+- 参数量 ≤ 5M（轻量化目标）
+- Jetson Nano ≥ 30 FPS（边缘部署目标）
+
+真实数据需在本地 GPU 机器上训练后获取。
 
 # 运行演示
 python demo.py
