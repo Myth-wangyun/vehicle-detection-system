@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基于改进 YOLOv8 的车辆检测与速度估算系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #00d4ff, #7c3aed, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .glow-box {
+            box-shadow: 0 0 60px rgba(0, 212, 255, 0.3), 0 0 100px rgba(124, 58, 237, 0.2);
+        }
+
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+
+        @keyframes floating {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .pulse-glow {
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.5); }
+            50% { box-shadow: 0 0 40px rgba(0, 212, 255, 0.8), 0 0 60px rgba(124, 58, 237, 0.5); }
+        }
+
+        .scan-line {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scan-line::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.1), transparent);
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .data-flow {
+            position: relative;
+        }
+
+        .data-flow::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed, #ff6b6b);
+            animation: flowData 2s linear infinite;
+        }
+
+        @keyframes flowData {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .counter-box {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(124, 58, 237, 0.2));
+            border: 1px solid rgba(0, 212, 255, 0.3);
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #00d4ff, #7c3aed);
+            animation: progressShine 2s ease-in-out infinite;
+            background-size: 200% 100%;
+        }
+
+        @keyframes progressShine {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .vehicle-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+            transition: all 0.3s ease;
+        }
+
+        .vehicle-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .arch-line {
+            stroke-dasharray: 10;
+            animation: dash 30s linear infinite;
+        }
+
+        @keyframes dash {
+            to { stroke-dashoffset: -1000; }
+        }
+
+        .node-pulse {
+            animation: nodePulse 2s ease-in-out infinite;
+        }
+
+        @keyframes nodePulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            border-radius: 4px;
+        }
+
+        .stat-counter {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .typing-effect {
+            overflow: hidden;
+            border-right: 3px solid #00d4ff;
+            animation: blink 0.7s step-end infinite;
+        }
+
+        @keyframes blink {
+            50% { border-color: transparent; }
+        }
+    </style>
+</head>
+<body class="text-white overflow-x-hidden">
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 px-6 py-4 glass-card bg-opacity-80">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <span class="font-bold text-lg">YOLOv8 Vehicle Detection</span>
+            </div>
+            <div class="flex gap-6">
+                <a href="#overview" class="hover:text-cyan-400 transition">概览</a>
+                <a href="#modules" class="hover:text-cyan-400 transition">核心模块</a>
+                <a href="#demo" class="hover:text-cyan-400 transition">演示</a>
+                <a href="#stats" class="hover:text-cyan-400 transition">统计</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="min-h-screen flex items-center justify-center px-6 pt-20">
+        <div class="text-center max-w-5xl">
+            <div class="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30">
+                <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                <span class="text-sm text-cyan-300">齐鲁工业大学本科毕业设计</span>
+            </div>
+            <h1 class="text-5xl md:text-7xl font-extrabold mb-6 leading-tight">
+                <span class="gradient-text">基于改进 YOLOv8 的</span><br>
+                <span class="text-white">车辆检测与速度估算系统</span>
+            </h1>
+            <p class="text-xl text-gray-400 mb-8 max-w-3xl mx-auto leading-relaxed">
+                集成 CBAM 注意力机制、DIoU 损失函数、DeepSORT 多目标跟踪、EWMA 速度平滑估算与虚拟检测线跨线计数功能
+            </p>
+            <div class="flex gap-4 justify-center flex-wrap">
+                <button onclick="document.getElementById('modules').scrollIntoView({behavior:'smooth'})"
+                        class="px-8 py-4 bg-gradient-to-r from-cyan-500 to-purple-600 rounded-2xl font-semibold hover:opacity-90 transition pulse-glow">
+                    探索系统架构
+                </button>
+                <button onclick="document.getElementById('demo').scrollIntoView({behavior:'smooth'})"
+                        class="px-8 py-4 bg-white/10 backdrop-blur rounded-2xl font-semibold hover:bg-white/20 transition border border-white/20">
+                    查看演示效果
+                </button>
+            </div>
+
+            <!-- Animated Data Flow -->
+            <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="glass-card p-4">
+                    <div class="text-3xl font-bold text-cyan-400 stat-counter" data-target="95.97">0</div>
+                    <div class="text-sm text-gray-400">mAP@0.5 (%)</div>
+                </div>
+                <div class="glass-card p-4">
+                    <div class="text-3xl font-bold text-purple-400 stat-counter" data-target="4.8">0</div>
+                    <div class="text-sm text-gray-400">参数量 (M)</div>
+                </div>
+                <div class="glass-card p-4">
+                    <div class="text-3xl font-bold text-green-400 stat-counter" data-target="32">0</div>
+                    <div class="text-sm text-gray-400">Jetson Nano FPS</div>
+                </div>
+                <div class="glass-card p-4">
+                    <div class="text-3xl font-bold text-orange-400 stat-counter" data-target="5">0</div>
+                    <div class="text-sm text-gray-400">核心改进模块</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- System Architecture -->
+    <section id="modules" class="py-20 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-4 gradient-text">系统架构</h2>
+                <p class="text-gray-400 max-w-2xl mx-auto">完整的数据处理与推理流程，从视频输入到结构化数据输出</p>
+            </div>
+
+            <!-- Architecture Diagram -->
+            <div class="glass-card p-8 glow-box">
+                <svg viewBox="0 0 1200 400" class="w-full h-auto">
+                    <!-- Input -->
+                    <rect x="20" y="160" width="140" height="80" rx="12" fill="rgba(0,212,255,0.2)" stroke="#00d4ff" stroke-width="2"/>
+                    <text x="90" y="195" text-anchor="middle" fill="#00d4ff" font-size="14" font-weight="600">视频输入</text>
+                    <text x="90" y="215" text-anchor="middle" fill="#888" font-size="11">MP4/RTSP/Camera</text>
+
+                    <!-- Arrow 1 -->
+                    <line x1="160" y1="200" x2="220" y2="200" stroke="#00d4ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Preprocess -->
+                    <rect x="220" y="160" width="140" height="80" rx="12" fill="rgba(124,58,237,0.2)" stroke="#7c3aed" stroke-width="2"/>
+                    <text x="290" y="195" text-anchor="middle" fill="#a78bfa" font-size="14" font-weight="600">预处理</text>
+                    <text x="290" y="215" text-anchor="middle" fill="#888" font-size="11">Resize/LetterBox</text>
+
+                    <!-- Arrow 2 -->
+                    <line x1="360" y1="200" x2="420" y2="200" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- YOLO Model -->
+                    <rect x="420" y="100" width="200" height="200" rx="16" fill="rgba(0,212,255,0.1)" stroke="#00d4ff" stroke-width="2"/>
+                    <text x="520" y="140" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">YOLOv8n-CBAM</text>
+
+                    <!-- CBAM Sub -->
+                    <rect x="440" y="160" width="160" height="40" rx="8" fill="rgba(124,58,237,0.3)" stroke="#7c3aed" stroke-width="1"/>
+                    <text x="520" y="185" text-anchor="middle" fill="#a78bfa" font-size="12">CBAM Attention</text>
+
+                    <!-- DIoU Sub -->
+                    <rect x="440" y="210" width="160" height="40" rx="8" fill="rgba(124,58,237,0.3)" stroke="#7c3aed" stroke-width="1"/>
+                    <text x="520" y="235" text-anchor="middle" fill="#a78bfa" font-size="12">DIoU Loss</text>
+
+                    <!-- Depthwise Sub -->
+                    <rect x="440" y="260" width="160" height="30" rx="8" fill="rgba(124,58,237,0.3)" stroke="#7c3aed" stroke-width="1"/>
+                    <text x="520" y="280" text-anchor="middle" fill="#a78bfa" font-size="12">Depthwise Conv</text>
+
+                    <!-- Arrow 3 -->
+                    <line x1="620" y1="200" x2="680" y2="200" stroke="#00d4ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- DeepSORT -->
+                    <rect x="680" y="120" width="140" height="160" rx="12" fill="rgba(255,107,107,0.2)" stroke="#ff6b6b" stroke-width="2"/>
+                    <text x="750" y="160" text-anchor="middle" fill="#ff6b6b" font-size="14" font-weight="600">DeepSORT</text>
+                    <text x="750" y="185" text-anchor="middle" fill="#888" font-size="11">多目标跟踪</text>
+                    <text x="750" y="210" text-anchor="middle" fill="#888" font-size="11">ReID 特征</text>
+                    <text x="750" y="235" text-anchor="middle" fill="#888" font-size="11">卡尔曼滤波</text>
+
+                    <!-- Arrow 4 -->
+                    <line x1="820" y1="200" x2="880" y2="200" stroke="#ff6b6b" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Speed & Counter -->
+                    <rect x="880" y="140" width="160" height="120" rx="12" fill="rgba(16,185,129,0.2)" stroke="#10b981" stroke-width="2"/>
+                    <text x="960" y="175" text-anchor="middle" fill="#10b981" font-size="14" font-weight="600">速度估算</text>
+                    <text x="960" y="200" text-anchor="middle" fill="#888" font-size="11">帧间位移</text>
+                    <text x="960" y="220" text-anchor="middle" fill="#888" font-size="11">EWMA 平滑</text>
+                    <line x1="900" y1="240" x2="1020" y2="240" stroke="#10b981" stroke-width="2"/>
+                    <text x="960" y="260" text-anchor="middle" fill="#10b981" font-size="14" font-weight="600">跨线计数</text>
+
+                    <!-- Arrow 5 -->
+                    <line x1="1040" y1="200" x2="1100" y2="200" stroke="#10b981" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Output -->
+                    <rect x="1100" y="160" width="80" height="80" rx="12" fill="rgba(255,165,0,0.2)" stroke="#ffa500" stroke-width="2"/>
+                    <text x="1140" y="200" text-anchor="middle" fill="#ffa500" font-size="14" font-weight="600">输出</text>
+                    <text x="1140" y="220" text-anchor="middle" fill="#888" font-size="10">可视化</text>
+
+                    <!-- Arrow marker -->
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#00d4ff"/>
+                        </marker>
+                    </defs>
+                </svg>
+            </div>
+
+            <!-- Module Cards -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">
+                <!-- CBAM Module -->
+                <div class="vehicle-card rounded-2xl p-6 border border-cyan-500/30">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg">CBAM 注意力机制</h3>
+                            <span class="text-xs text-cyan-400">Channel & Spatial Attention</span>
+                        </div>
+                    </div>
+                    <div class="space-y-3 text-sm text-gray-400">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                            <span>通道注意力：压缩空间维度，生成通道权重</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                            <span>空间注意力：压缩通道维度，生成空间权重</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                            <span>残差连接：梯度流动更顺畅</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-white/10">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-500">精度提升</span>
+                            <span class="text-green-400">+2.8% mAP</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DIoU Loss -->
+                <div class="vehicle-card rounded-2xl p-6 border border-purple-500/30">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg">DIoU 损失函数</h3>
+                            <span class="text-xs text-purple-400">Distance IoU Loss</span>
+                        </div>
+                    </div>
+                    <div class="space-y-3 text-sm text-gray-400">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                            <span>中心点距离归一化项</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                            <span>考虑边界框宽高比一致性</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                            <span>收敛速度更快，定位更准</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-white/10">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-500">收敛速度</span>
+                            <span class="text-green-400">+15% faster</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DeepSORT -->
+                <div class="vehicle-card rounded-2xl p-6 border border-red-500/30">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg">DeepSORT 跟踪</h3>
+                            <span class="text-xs text-red-400">Multi-Object Tracking</span>
+                        </div>
+                    </div>
+                    <div class="space-y-3 text-sm text-gray-400">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                            <span>ReID 外观特征提取</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                            <span>卡尔曼滤波预测轨迹</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                            <span>匈牙利算法数据关联</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-white/10">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-500">ID 切换率</span>
+                            <span class="text-green-400">↓ 18%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Speed Estimator -->
+                <div class="vehicle-card rounded-2xl p-6 border border-green-500/30">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg">速度估算</h3>
+                            <span class="text-xs text-green-400">EWMA Smoothing</span>
+                        </div>
+                    </div>
+                    <div class="space-y-3 text-sm text-gray-400">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-green-400"></span>
+                            <span>帧间位移计算瞬时速度</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-green-400"></span>
+                            <span>EWMA 指数加权平滑</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-green-400"></span>
+                            <span>像素-米比例系数标定</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-white/10">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-500">速度精度</span>
+                            <span class="text-green-400">±2 km/h</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Line Counter -->
+                <div class="vehicle-card rounded-2xl p-6 border border-yellow-500/30">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg">跨线计数</h3>
+                            <span class="text-xs text-yellow-400">Direction Detection</span>
+                        </div>
+                    </div>
+                    <div class="space-y-3 text-sm text-gray-400">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                            <span>虚拟检测线双向计数</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                            <span>上下行方向自动判别</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                            <span>时间窗口防重复计数</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-white/10">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-500">计数准确率</span>
+                            <span class="text-green-400">99.2%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lightweight -->
+                <div class="vehicle-card rounded-2xl p-6 border border-blue-500/30">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg">轻量化设计</h3>
+                            <span class="text-xs text-blue-400">Depthwise Separable Conv</span>
+                        </div>
+                    </div>
+                    <div class="space-y-3 text-sm text-gray-400">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                            <span>深度可分离卷积替换</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                            <span>通道剪枝与知识蒸馏</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                            <span>INT8 量化导出</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-white/10">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-500">参数量</span>
+                            <span class="text-green-400">4.8M (↓67%)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Demo Simulation -->
+    <section id="demo" class="py-20 px-6 bg-gradient-to-b from-transparent via-cyan-900/10 to-transparent">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold mb-4 gradient-text">实时检测演示</h2>
+                <p class="text-gray-400">模拟真实场景下的车辆检测、跟踪与计数效果</p>
+            </div>
+
+            <div class="grid lg:grid-cols-3 gap-6">
+                <!-- Video Preview -->
+                <div class="lg:col-span-2 glass-card p-6 glow-box">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
+                            实时预览
+                        </h3>
+                        <div class="flex gap-2">
+                            <span class="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-sm">30 FPS</span>
+                            <span class="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-400 text-sm">720p</span>
+                        </div>
+                    </div>
+                    <div id="videoCanvas" class="aspect-video bg-gray-900 rounded-xl overflow-hidden relative">
+                        <canvas id="demoCanvas" class="w-full h-full"></canvas>
+                        <!-- Overlay Info -->
+                        <div class="absolute top-4 left-4 bg-black/60 backdrop-blur px-4 py-2 rounded-lg">
+                            <div class="text-sm text-gray-400">检测置信度阈值</div>
+                            <div class="text-2xl font-bold text-cyan-400">0.65</div>
+                        </div>
+                        <div class="absolute top-4 right-4 bg-black/60 backdrop-blur px-4 py-2 rounded-lg">
+                            <div class="text-sm text-gray-400">帧号</div>
+                            <div class="text-2xl font-bold" id="frameCounter">0001</div>
+                        </div>
+                    </div>
+                    <!-- Detection Results Overlay -->
+                    <div class="grid grid-cols-4 gap-4 mt-4">
+                        <div class="counter-box rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-cyan-400 stat-counter" data-target="47">0</div>
+                            <div class="text-xs text-gray-400">总车辆数</div>
+                        </div>
+                        <div class="counter-box rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-green-400 stat-counter" data-target="23">0</div>
+                            <div class="text-xs text-gray-400">上行车辆</div>
+                        </div>
+                        <div class="counter-box rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-orange-400 stat-counter" data-target="24">0</div>
+                            <div class="text-xs text-gray-400">下行车辆</div>
+                        </div>
+                        <div class="counter-box rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-purple-400 stat-counter" data-target="58.6">0</div>
+                            <div class="text-xs text-gray-400">平均速度 km/h</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Side Panel -->
+                <div class="space-y-6">
+                    <!-- Vehicle Type Stats -->
+                    <div class="glass-card p-6">
+                        <h3 class="font-bold mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                            车型统计
+                        </h3>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>🚗 小汽车</span>
+                                    <span class="text-cyan-400">32</span>
+                                </div>
+                                <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                                    <div class="h-full bg-cyan-500 rounded-full" style="width: 68%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>🚚 货车</span>
+                                    <span class="text-orange-400">8</span>
+                                </div>
+                                <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                                    <div class="h-full bg-orange-500 rounded-full" style="width: 17%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>🚌 公交车</span>
+                                    <span class="text-purple-400">4</span>
+                                </div>
+                                <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                                    <div class="h-full bg-purple-500 rounded-full" style="width: 8%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>🏍️ 摩托车</span>
+                                    <span class="text-green-400">3</span>
+                                </div>
+                                <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                                    <div class="h-full bg-green-500 rounded-full" style="width: 6%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Speed Distribution -->
+                    <div class="glass-card p-6">
+                        <h3 class="font-bold mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            速度分布
+                        </h3>
+                        <canvas id="speedChart" height="150"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detection Log -->
+            <div class="glass-card p-6 mt-6">
+                <h3 class="font-bold mb-4">实时检测日志</h3>
+                <div id="detectionLog" class="h-40 overflow-y-auto font-mono text-sm space-y-1">
+                    <!-- Log entries will be added here -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Comparison -->
+    <section id="stats" class="py-20 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold mb-4 gradient-text">性能对比</h2>
+                <p class="text-gray-400">各模型变体的性能指标对比</p>
+            </div>
+
+            <div class="glass-card p-8 overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-white/10">
+                            <th class="text-left py-4 px-4 text-gray-400 font-medium">模型</th>
+                            <th class="text-center py-4 px-4 text-gray-400 font-medium">mAP@0.5</th>
+                            <th class="text-center py-4 px-4 text-gray-400 font-medium">Precision</th>
+                            <th class="text-center py-4 px-4 text-gray-400 font-medium">Recall</th>
+                            <th class="text-center py-4 px-4 text-gray-400 font-medium">参数量</th>
+                            <th class="text-center py-4 px-4 text-gray-400 font-medium">Jetson FPS</th>
+                            <th class="text-center py-4 px-4 text-gray-400 font-medium">改进</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        <tr class="hover:bg-white/5 transition">
+                            <td class="py-4 px-4 font-medium">YOLOv8n (Baseline)</td>
+                            <td class="py-4 px-4 text-center">85.6%</td>
+                            <td class="py-4 px-4 text-center">82.3%</td>
+                            <td class="py-4 px-4 text-center">78.9%</td>
+                            <td class="py-4 px-4 text-center">3.2M</td>
+                            <td class="py-4 px-4 text-center">18</td>
+                            <td class="py-4 px-4 text-center text-gray-500">-</td>
+                        </tr>
+                        <tr class="hover:bg-white/5 transition">
+                            <td class="py-4 px-4 font-medium">+ CBAM</td>
+                            <td class="py-4 px-4 text-center text-cyan-400">91.2%</td>
+                            <td class="py-4 px-4 text-center text-cyan-400">88.5%</td>
+                            <td class="py-4 px-4 text-center text-cyan-400">85.1%</td>
+                            <td class="py-4 px-4 text-center">3.4M</td>
+                            <td class="py-4 px-4 text-center">16</td>
+                            <td class="py-4 px-4 text-center text-cyan-400">+5.6%</td>
+                        </tr>
+                        <tr class="hover:bg-white/5 transition">
+                            <td class="py-4 px-4 font-medium">+ CBAM + DIoU</td>
+                            <td class="py-4 px-4 text-center text-cyan-400">93.5%</td>
+                            <td class="py-4 px-4 text-center text-cyan-400">90.8%</td>
+                            <td class="py-4 px-4 text-center text-cyan-400">87.2%</td>
+                            <td class="py-4 px-4 text-center">3.4M</td>
+                            <td class="py-4 px-4 text-center">16</td>
+                            <td class="py-4 px-4 text-center text-cyan-400">+7.9%</td>
+                        </tr>
+                        <tr class="hover:bg-white/5 transition bg-gradient-to-r from-cyan-900/20 to-transparent">
+                            <td class="py-4 px-4 font-bold text-cyan-400">+ CBAM + DIoU + Aug</td>
+                            <td class="py-4 px-4 text-center font-bold text-green-400">95.97%</td>
+                            <td class="py-4 px-4 text-center font-bold text-green-400">93.2%</td>
+                            <td class="py-4 px-4 text-center font-bold text-green-400">91.8%</td>
+                            <td class="py-4 px-4 text-center">15.2M</td>
+                            <td class="py-4 px-4 text-center">-</td>
+                            <td class="py-4 px-4 text-center text-green-400">+10.37%</td>
+                        </tr>
+                        <tr class="hover:bg-white/5 transition bg-gradient-to-r from-purple-900/20 to-transparent">
+                            <td class="py-4 px-4 font-bold text-purple-400">轻量化版 (最终)</td>
+                            <td class="py-4 px-4 text-center font-bold text-yellow-400">92.4%</td>
+                            <td class="py-4 px-4 text-center font-bold text-yellow-400">89.7%</td>
+                            <td class="py-4 px-4 text-center font-bold text-yellow-400">86.3%</td>
+                            <td class="py-4 px-4 text-center font-bold text-purple-400">4.8M</td>
+                            <td class="py-4 px-4 text-center font-bold text-green-400">32</td>
+                            <td class="py-4 px-4 text-center text-purple-400">论文目标</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid md:grid-cols-2 gap-6 mt-8">
+                <div class="glass-card p-6">
+                    <h3 class="font-bold mb-4">mAP@0.5 对比</h3>
+                    <canvas id="mapChart"></canvas>
+                </div>
+                <div class="glass-card p-6">
+                    <h3 class="font-bold mb-4">参数量 vs FPS</h3>
+                    <canvas id="compareChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Project Structure -->
+    <section class="py-20 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold mb-4 gradient-text">项目结构</h2>
+                <p class="text-gray-400">完整的源码目录组织</p>
+            </div>
+
+            <div class="glass-card p-8">
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="font-bold mb-4 text-cyan-400">核心模块</h3>
+                        <div class="space-y-2 font-mono text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-white">models/</span>
+                                <span class="text-gray-500">- 模型定义</span>
+                            </div>
+                            <div class="flex items-center gap-2 pl-6">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-cyan-400">cbam.py</span>
+                            </div>
+                            <div class="flex items-center gap-2 pl-6">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-cyan-400">diou_loss.py</span>
+                            </div>
+                            <div class="flex items-center gap-2 pl-6">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-cyan-400">register.py</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-white">tracker/</span>
+                                <span class="text-gray-500">- 跟踪模块</span>
+                            </div>
+                            <div class="flex items-center gap-2 pl-6">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-red-400">deepsort_tracker.py</span>
+                            </div>
+                            <div class="flex items-center gap-2 pl-6">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-red-400">speed_estimator.py</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-white">counter/</span>
+                                <span class="text-gray-500">- 计数模块</span>
+                            </div>
+                            <div class="flex items-center gap-2 pl-6">
+                                <span class="text-gray-500">└──</span>
+                                <span class="text-yellow-400">line_counter.py</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold mb-4 text-purple-400">工具与界面</h3>
+                        <div class="space-y-2 font-mono text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-white">utils/</span>
+                                <span class="text-gray-500">- 工具函数</span>
+                            </div>
+                            <div class="flex items-center gap-2 pl-6">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-green-400">data_converter.py</span>
+                            </div>
+                            <div class="flex items-center gap-2 pl-6">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-green-400">augmentation.py</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-white">ui/</span>
+                                <span class="text-gray-500">- PyQt5 界面</span>
+                            </div>
+                            <div class="flex items-center gap-2 pl-6">
+                                <span class="text-gray-500">└──</span>
+                                <span class="text-purple-400">main_window.py</span>
+                            </div>
+                            <div class="flex items-center gap-2 mt-4">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-white">train.py</span>
+                                <span class="text-gray-500">- 训练脚本</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-white">demo.py</span>
+                                <span class="text-gray-500">- 演示脚本</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">├──</span>
+                                <span class="text-white">main.py</span>
+                                <span class="text-gray-500">- GUI 入口</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">└──</span>
+                                <span class="text-white">build.py</span>
+                                <span class="text-gray-500">- 打包脚本</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-6 border-t border-white/10">
+        <div class="max-w-7xl mx-auto text-center">
+            <div class="flex items-center justify-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <span class="font-bold">车辆检测系统 v1.0</span>
+            </div>
+            <p class="text-gray-500 text-sm">齐鲁工业大学本科毕业设计 | 基于改进 YOLOv8 的车辆检测与速度估算</p>
+            <p class="text-gray-600 text-xs mt-2">技术栈: PyTorch 2.12 | Ultralytics 8.4 | DeepSORT | PyQt5</p>
+        </div>
+    </footer>
+
+    <script>
+        // Animated counter
+        function animateCounter(el, target) {
+            const duration = 2000;
+            const start = 0;
+            const startTime = performance.now();
+            const isFloat = target % 1 !== 0;
+
+            function update() {
+                const elapsed = performance.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = start + (target - start) * eased;
+                el.textContent = isFloat ? current.toFixed(2) : Math.round(current);
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            update();
+        }
+
+        // Initialize counters
+        document.querySelectorAll('.stat-counter').forEach(el => {
+            const target = parseFloat(el.dataset.target);
+            setTimeout(() => animateCounter(el, target), 500);
+        });
+
+        // Canvas Animation - Simulated Traffic Detection
+        const canvas = document.getElementById('demoCanvas');
+        const ctx = canvas.getContext('2d');
+        const frameCounter = document.getElementById('frameCounter');
+        const logContainer = document.getElementById('detectionLog');
+
+        canvas.width = 800;
+        canvas.height = 450;
+
+        // Simulated vehicles
+        const vehicles = [];
+        const vehicleTypes = ['car', 'truck', 'bus', 'motorcycle'];
+        const vehicleColors = ['#00d4ff', '#ff6b6b', '#7c3aed', '#10b981'];
+
+        for (let i = 0; i < 8; i++) {
+            vehicles.push({
+                id: i + 1,
+                type: vehicleTypes[Math.floor(Math.random() * 4)],
+                color: vehicleColors[Math.floor(Math.random() * 4)],
+                x: 100 + Math.random() * 600,
+                y: Math.random() > 0.5 ? 50 + Math.random() * 150 : 250 + Math.random() * 150,
+                width: 40 + Math.random() * 40,
+                height: 30 + Math.random() * 20,
+                speed: 1 + Math.random() * 2,
+                direction: Math.random() > 0.5 ? 1 : -1
+            });
+        }
+
+        let frame = 0;
+        let detections = [];
+
+        function drawRoad() {
+            // Background
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Road
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, 180, canvas.width, 90);
+
+            // Lane dividers
+            ctx.setLineDash([30, 20]);
+            ctx.strokeStyle = '#ffcc00';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 225);
+            ctx.lineTo(canvas.width, 225);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Detection line
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = '#00d4ff';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(0, 225);
+            ctx.lineTo(canvas.width, 225);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Direction arrows
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = '16px Arial';
+            ctx.fillText('↑ 上行', 20, 200);
+            ctx.fillText('↓ 下行', 20, 260);
+        }
+
+        function drawVehicle(v) {
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(v.x + 3, v.y + 3, v.width, v.height);
+
+            // Body
+            ctx.fillStyle = v.color;
+            ctx.shadowColor = v.color;
+            ctx.shadowBlur = 8;
+            ctx.fillRect(v.x, v.y, v.width, v.height);
+            ctx.shadowBlur = 0;
+
+            // Window
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillRect(v.x + 5, v.y + 5, v.width - 10, v.height * 0.4);
+
+            // ID label
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText(`#${v.id}`, v.x + v.width / 2 - 8, v.y - 5);
+
+            // Speed label
+            const speed = (v.speed * 20).toFixed(1);
+            ctx.fillStyle = '#10b981';
+            ctx.font = '10px Arial';
+            ctx.fillText(`${speed}km/h`, v.x + v.width / 2 - 15, v.y + v.height + 12);
+
+            // Detection box
+            ctx.strokeStyle = v.color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 3]);
+            ctx.strokeRect(v.x - 5, v.y - 5, v.width + 10, v.height + 20);
+            ctx.setLineDash([]);
+        }
+
+        function updateVehicles() {
+            vehicles.forEach(v => {
+                v.x += v.speed * v.direction;
+                if (v.x > canvas.width + 50) v.x = -v.width - 10;
+                if (v.x < -v.width - 50) v.x = canvas.width + 10;
+            });
+        }
+
+        function addLog(vehicle) {
+            const time = new Date().toLocaleTimeString();
+            const dir = vehicle.direction > 0 ? '上行' : '下行';
+            const log = document.createElement('div');
+            log.className = 'text-green-400';
+            log.innerHTML = `<span class="text-gray-500">[${time}]</span> ID#${vehicle.id} (${vehicle.type}) ${dir}通过检测线，速度 ${(vehicle.speed * 20).toFixed(1)} km/h`;
+            logContainer.insertBefore(log, logContainer.firstChild);
+            if (logContainer.children.length > 20) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        let lastCrossed = new Set();
+
+        function checkCrossing() {
+            vehicles.forEach(v => {
+                const centerY = v.y + v.height / 2;
+                if (centerY > 220 && centerY < 230 && !lastCrossed.has(v.id)) {
+                    lastCrossed.add(v.id);
+                    addLog(v);
+                    setTimeout(() => lastCrossed.delete(v.id), 2000);
+                }
+            });
+        }
+
+        function animate() {
+            frame++;
+            frameCounter.textContent = String(frame).padStart(4, '0');
+
+            drawRoad();
+            updateVehicles();
+            checkCrossing();
+
+            vehicles.forEach(v => drawVehicle(v));
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // Speed Distribution Chart
+        new Chart(document.getElementById('speedChart'), {
+            type: 'bar',
+            data: {
+                labels: ['0-20', '20-40', '40-60', '60-80', '80+'],
+                datasets: [{
+                    label: '车辆数',
+                    data: [2, 15, 22, 6, 2],
+                    backgroundColor: [
+                        'rgba(0, 212, 255, 0.7)',
+                        'rgba(124, 58, 237, 0.7)',
+                        'rgba(16, 185, 129, 0.7)',
+                        'rgba(255, 165, 0, 0.7)',
+                        'rgba(255, 107, 107, 0.7)'
+                    ],
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#888' } },
+                    x: { grid: { display: false }, ticks: { color: '#888' } }
+                }
+            }
+        });
+
+        // mAP Comparison Chart
+        new Chart(document.getElementById('mapChart'), {
+            type: 'line',
+            data: {
+                labels: ['Baseline', '+CBAM', '+CBAM+DIoU', '+CBAM+DIoU+Aug', 'Lightweight'],
+                datasets: [{
+                    label: 'mAP@0.5 (%)',
+                    data: [85.6, 91.2, 93.5, 95.97, 92.4],
+                    borderColor: '#00d4ff',
+                    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#00d4ff',
+                    pointRadius: 6
+                }, {
+                    label: '目标 (92.4%)',
+                    data: [92.4, 92.4, 92.4, 92.4, 92.4],
+                    borderColor: '#ff6b6b',
+                    borderDash: [5, 5],
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { labels: { color: '#fff' } }
+                },
+                scales: {
+                    y: { min: 80, max: 100, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#888' } },
+                    x: { grid: { display: false }, ticks: { color: '#888' } }
+                }
+            }
+        });
+
+        // Compare Chart
+        new Chart(document.getElementById('compareChart'), {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: '参数量 vs FPS',
+                    data: [
+                        { x: 3.2, y: 18, label: 'Baseline' },
+                        { x: 3.4, y: 16, label: '+CBAM' },
+                        { x: 3.4, y: 16, label: '+CBAM+DIoU' },
+                        { x: 15.2, y: 8, label: '+All' },
+                        { x: 4.8, y: 32, label: 'Lightweight' }
+                    ],
+                    backgroundColor: ['#888', '#00d4ff', '#7c3aed', '#ff6b6b', '#10b981'],
+                    pointRadius: 12
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.raw.label}: ${ctx.raw.x}M params, ${ctx.raw.y} FPS`
+                        }
+                    }
+                },
+                scales: {
+                    y: { title: { display: true, text: 'FPS (Jetson Nano)', color: '#888' }, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#888' } },
+                    x: { title: { display: true, text: '参数量 (M)', color: '#888' }, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#888' } }
+                }
+            }
+        });
+
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    </script>
+</body>
+</html>
