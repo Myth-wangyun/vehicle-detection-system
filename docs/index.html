@@ -224,9 +224,14 @@
 
         .gallery-item img {
             width: 100%;
-            height: 100%;
+            height: 200px;
             object-fit: cover;
             transition: transform 0.3s ease;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            opacity: 0;
+        }
+        .gallery-item img.loaded {
+            opacity: 1;
         }
 
         .gallery-item:hover img {
@@ -485,7 +490,7 @@
                             <div class="demo-stat-label">FPS</div>
                         </div>
                     </div>
-                    <div class="log-panel" id="logPanel"></div>
+                    <div class="log-panel" id="logPanel" style="max-height: 80px; overflow-y: auto; font-family: monospace;"></div>
                 </div>
             </div>
         </div>
@@ -558,10 +563,16 @@
         <script src="images_base64.js"></script>
         <script>
             // 加载真实图片
-            for (const [name, src] of Object.entries(BASE64_IMAGES)) {
-                const img = document.getElementById('gallery-' + name);
-                if (img) img.src = src;
-            }
+            window.addEventListener('load', function() {
+                for (const [name, src] of Object.entries(BASE64_IMAGES)) {
+                    const img = document.getElementById('gallery-' + name);
+                    if (img && src) {
+                        img.src = src;
+                        img.onload = function() { this.classList.add('loaded'); };
+                        img.onerror = function() { this.classList.add('loaded'); };
+                    }
+                }
+            });
         </script>
     </section>
 
@@ -737,83 +748,467 @@
             }, 500);
         });
 
-        // ========== Demo Canvas Animation ==========
+        // ========== Rich Demo Canvas Animation ==========
         const canvas = document.getElementById('demoCanvas');
         const ctx = canvas.getContext('2d');
-
-        // Demo data
+        
+        // 场景状态
+        let sceneMode = 'day'; // day, night, rain, snow
+        let sceneTimer = 0;
+        let raindrops = [];
+        let snowflakes = [];
+        
+        // 车辆类型配置
+        const vehicleTypes = {
+            car: { width: 60, height: 35, colors: ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6'] },
+            truck: { width: 90, height: 45, colors: ['#34495e', '#e67e22', '#1abc9c'] },
+            bus: { width: 110, height: 40, colors: ['#e74c3c', '#3498db', '#f39c12'] },
+            motorcycle: { width: 35, height: 25, colors: ['#2c3e50', '#c0392b', '#27ae60'] }
+        };
+        
+        // 车辆数据
         const vehicles = [
-            { id: 1, x: 50, y: 200, speed: 60, color: '#00ff88', type: 'Car', lane: 0 },
-            { id: 2, x: 300, y: 280, speed: 45, color: '#00aaff', type: 'Truck', lane: 1 },
-            { id: 3, x: 500, y: 200, speed: 80, color: '#ff8800', type: 'Car', lane: 0 },
-            { id: 4, x: 150, y: 360, speed: 55, color: '#ff0088', type: 'Bus', lane: 2 },
+            { id: 1, x: 50, y: 180, speed: 65, type: 'car', dir: 1 },
+            { id: 2, x: 250, y: 250, speed: 45, type: 'truck', dir: 1 },
+            { id: 3, x: 500, y: 180, speed: 80, type: 'car', dir: -1 },
+            { id: 4, x: 350, y: 320, speed: 55, type: 'bus', dir: 1 },
+            { id: 5, x: 150, y: 250, speed: 70, type: 'car', dir: 1 },
+            { id: 6, x: 600, y: 320, speed: 40, type: 'truck', dir: -1 },
+            { id: 7, x: 400, y: 180, speed: 90, type: 'motorcycle', dir: 1 },
         ];
-
-        let vehicleCount = 0;
-        let trackCount = 0;
-        let totalSpeed = 0;
+        
+        // 统计
+        let totalCount = 0;
+        let crossCount = { left: 0, right: 0 };
         let logMessages = [];
         let frameCount = 0;
         let lastTime = performance.now();
         let currentFps = 0;
-
-        function drawDemo() {
-            // Clear
-            ctx.fillStyle = '#0a0a0a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw road
+        
+        // 初始化雨滴
+        for (let i = 0; i < 100; i++) {
+            raindrops.push({ x: Math.random() * 800, y: Math.random() * 450, speed: 10 + Math.random() * 10 });
+        }
+        
+        // 初始化雪花
+        for (let i = 0; i < 50; i++) {
+            snowflakes.push({ x: Math.random() * 800, y: Math.random() * 450, speed: 1 + Math.random() * 2, size: 2 + Math.random() * 3 });
+        }
+        
+        function drawCar(x, y, w, h, color, dir) {
+            // 车身阴影
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(x + w/2, y + h + 5, w/2, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 车身
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            if (dir > 0) {
+                ctx.moveTo(x, y + h);
+                ctx.lineTo(x, y + h * 0.4);
+                ctx.lineTo(x + w * 0.25, y);
+                ctx.lineTo(x + w * 0.75, y);
+                ctx.lineTo(x + w, y + h * 0.4);
+                ctx.lineTo(x + w, y + h);
+            } else {
+                ctx.moveTo(x, y + h * 0.4);
+                ctx.lineTo(x, y + h);
+                ctx.lineTo(x + w, y + h);
+                ctx.lineTo(x + w, y + h * 0.4);
+                ctx.lineTo(x + w * 0.25, y);
+                ctx.lineTo(x + w * 0.75, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            
+            // 车窗
+            ctx.fillStyle = 'rgba(100, 150, 200, 0.8)';
+            if (dir > 0) {
+                ctx.fillRect(x + w * 0.15, y + 5, w * 0.3, h * 0.35);
+                ctx.fillRect(x + w * 0.5, y + 5, w * 0.35, h * 0.35);
+            } else {
+                ctx.fillRect(x + w * 0.5, y + 5, w * 0.35, h * 0.35);
+                ctx.fillRect(x + w * 0.15, y + 5, w * 0.3, h * 0.35);
+            }
+            
+            // 车轮
             ctx.fillStyle = '#1a1a1a';
-            ctx.fillRect(0, 150, canvas.width, 200);
-
-            // Draw lane lines
-            ctx.strokeStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(x + w * 0.2, y + h, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + w * 0.8, y + h, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 轮毂
+            ctx.fillStyle = '#666';
+            ctx.beginPath();
+            ctx.arc(x + w * 0.2, y + h, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + w * 0.8, y + h, 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 车灯
+            if (dir > 0) {
+                ctx.fillStyle = '#ffee88';
+                ctx.beginPath();
+                ctx.arc(x + w - 5, y + h * 0.5, 4, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.fillStyle = '#ffee88';
+                ctx.beginPath();
+                ctx.arc(x + 5, y + h * 0.5, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function drawTruck(x, y, w, h, color, dir) {
+            // 阴影
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(x + 5, y + h + 3, w, 10);
+            
+            // 货箱
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y + 10, w * 0.7, h - 10);
+            
+            // 驾驶室
+            ctx.fillStyle = dir > 0 ? color : '#555';
+            if (dir > 0) {
+                ctx.fillRect(x + w * 0.7, y + 5, w * 0.3, h - 5);
+                ctx.fillStyle = 'rgba(100, 150, 200, 0.8)';
+                ctx.fillRect(x + w * 0.75, y + 8, w * 0.2, h * 0.4);
+            } else {
+                ctx.fillRect(x, y + 5, w * 0.3, h - 5);
+                ctx.fillStyle = 'rgba(100, 150, 200, 0.8)';
+                ctx.fillRect(x + w * 0.05, y + 8, w * 0.2, h * 0.4);
+            }
+            
+            // 车轮
+            ctx.fillStyle = '#1a1a1a';
+            for (let wx of [x + 15, x + w * 0.4, x + w * 0.75]) {
+                ctx.beginPath();
+                ctx.arc(wx, y + h, 12, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function drawBus(x, y, w, h, color, dir) {
+            // 阴影
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(x + 5, y + h + 3, w, 10);
+            
+            // 车身
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y + 10, w, h - 10);
+            
+            // 窗户
+            ctx.fillStyle = 'rgba(100, 150, 200, 0.8)';
+            for (let wx = x + 10; wx < x + w - 15; wx += 25) {
+                ctx.fillRect(wx, y + 15, 20, h * 0.4);
+            }
+            
+            // 车轮
+            ctx.fillStyle = '#1a1a1a';
+            for (let wx of [x + 20, x + w * 0.35, x + w * 0.65, x + w - 20]) {
+                ctx.beginPath();
+                ctx.arc(wx, y + h, 12, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function drawMotorcycle(x, y, w, h, color) {
+            // 车身
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.ellipse(x + w/2, y + h/2, w/2, h/3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 车轮
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath();
+            ctx.arc(x + 5, y + h * 0.7, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + w - 5, y + h * 0.7, 6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 骑手
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(x + w/2, y - 5, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function drawVehicle(v) {
+            const config = vehicleTypes[v.type];
+            const w = config.width;
+            const h = config.height;
+            const color = config.colors[v.id % config.colors.length];
+            
+            if (v.type === 'car') {
+                drawCar(v.x - w/2, v.y - h/2, w, h, color, v.dir);
+            } else if (v.type === 'truck') {
+                drawTruck(v.x - w/2, v.y - h/2, w, h, color, v.dir);
+            } else if (v.type === 'bus') {
+                drawBus(v.x - w/2, v.y - h/2, w, h, color, v.dir);
+            } else if (v.type === 'motorcycle') {
+                drawMotorcycle(v.x - w/2, v.y - h/2, w, h, color);
+            }
+            
+            // 检测框
+            ctx.strokeStyle = '#00ff88';
             ctx.lineWidth = 2;
-            ctx.setLineDash([20, 10]);
+            ctx.strokeRect(v.x - w/2 - 5, v.y - h/2 - 5, w + 10, h + 10);
+            
+            // ID 标签背景
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(v.x - 25, v.y - h/2 - 30, 50, 20);
+            
+            // ID
+            ctx.fillStyle = '#00ff88';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`#${v.id}`, v.x, v.y - h/2 - 15);
+            
+            // 速度标签
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(v.x - 30, v.y + h/2 + 5, 60, 18);
+            ctx.fillStyle = '#ff8800';
+            ctx.font = '12px Arial';
+            ctx.fillText(`${v.speed} km/h`, v.x, v.y + h/2 + 18);
+            
+            ctx.textAlign = 'left';
+        }
+        
+        function drawScene() {
+            sceneTimer++;
+            if (sceneTimer > 600) {
+                sceneTimer = 0;
+                const modes = ['day', 'night', 'rain'];
+                sceneMode = modes[Math.floor(Math.random() * modes.length)];
+            }
+            
+            if (sceneMode === 'day') {
+                // 蓝天渐变
+                const grad = ctx.createLinearGradient(0, 0, 0, 150);
+                grad.addColorStop(0, '#87CEEB');
+                grad.addColorStop(1, '#E0F6FF');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 800, 150);
+                
+                // 云
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                for (let i = 0; i < 5; i++) {
+                    const cx = (sceneTimer * 0.5 + i * 200) % 900 - 100;
+                    ctx.beginPath();
+                    ctx.arc(cx, 50 + i * 15, 25, 0, Math.PI * 2);
+                    ctx.arc(cx + 20, 45 + i * 10, 20, 0, Math.PI * 2);
+                    ctx.arc(cx + 40, 50 + i * 15, 25, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // 建筑物
+                ctx.fillStyle = '#667';
+                for (let i = 0; i < 8; i++) {
+                    const bh = 50 + (i * 23) % 60;
+                    ctx.fillRect(50 + i * 100, 150 - bh, 80, bh);
+                    // 窗户
+                    ctx.fillStyle = '#99a';
+                    for (let wy = 150 - bh + 10; wy < 140; wy += 15) {
+                        for (let wx = 60 + i * 100; wx < 120 + i * 100; wx += 20) {
+                            ctx.fillRect(wx, wy, 10, 10);
+                        }
+                    }
+                    ctx.fillStyle = '#667';
+                }
+            } else if (sceneMode === 'night') {
+                // 夜空
+                ctx.fillStyle = '#0a1628';
+                ctx.fillRect(0, 0, 800, 150);
+                
+                // 星星
+                ctx.fillStyle = '#fff';
+                for (let i = 0; i < 50; i++) {
+                    const sx = (i * 37 + sceneTimer * 0.02) % 800;
+                    const sy = (i * 13) % 140;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 1, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // 建筑物夜景
+                ctx.fillStyle = '#223';
+                for (let i = 0; i < 8; i++) {
+                    const bh = 50 + (i * 23) % 60;
+                    ctx.fillRect(50 + i * 100, 150 - bh, 80, bh);
+                    // 窗户灯光
+                    ctx.fillStyle = '#ff0';
+                    for (let wy = 150 - bh + 10; wy < 140; wy += 15) {
+                        for (let wx = 60 + i * 100; wx < 120 + i * 100; wx += 20) {
+                            if (Math.random() > 0.3) {
+                                ctx.fillRect(wx, wy, 10, 10);
+                            }
+                        }
+                    }
+                    ctx.fillStyle = '#223';
+                }
+            } else if (sceneMode === 'rain') {
+                // 阴天
+                ctx.fillStyle = '#456';
+                ctx.fillRect(0, 0, 800, 150);
+                
+                // 雨滴
+                ctx.strokeStyle = 'rgba(200, 200, 255, 0.5)';
+                ctx.lineWidth = 1;
+                raindrops.forEach(drop => {
+                    ctx.beginPath();
+                    ctx.moveTo(drop.x, drop.y);
+                    ctx.lineTo(drop.x + 2, drop.y + 15);
+                    ctx.stroke();
+                    drop.y += drop.speed;
+                    drop.x += 1;
+                    if (drop.y > 450) {
+                        drop.y = -10;
+                        drop.x = Math.random() * 800;
+                    }
+                });
+            }
+        }
+        
+        function drawRoad() {
+            // 道路
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, 150, 800, 300);
+            
+            // 车道
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([30, 20]);
             ctx.beginPath();
             ctx.moveTo(0, 250);
-            ctx.lineTo(canvas.width, 250);
+            ctx.lineTo(800, 250);
+            ctx.moveTo(0, 330);
+            ctx.lineTo(800, 330);
             ctx.stroke();
             ctx.setLineDash([]);
-
-            // Draw detection line
+            
+            // 人行道
+            ctx.fillStyle = '#555';
+            ctx.fillRect(0, 450, 800, 50);
+            
+            // 检测线
             ctx.strokeStyle = '#ff0000';
             ctx.lineWidth = 3;
+            ctx.setLineDash([10, 5]);
             ctx.beginPath();
-            ctx.moveTo(canvas.width / 2, 150);
-            ctx.lineTo(canvas.width / 2, 350);
+            ctx.moveTo(400, 150);
+            ctx.lineTo(400, 450);
             ctx.stroke();
-
-            // Move and draw vehicles
+            ctx.setLineDash([]);
+            
+            // 检测线标签
+            ctx.fillStyle = '#ff0000';
+            ctx.font = '12px Arial';
+            ctx.fillText('检测线', 405, 145);
+        }
+        
+        function drawDetectionLine() {
+            // 检测线发光效果
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ff0000';
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(400, 150);
+            ctx.lineTo(400, 450);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+        
+        function drawStats() {
+            // 统计面板背景
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(10, 10, 180, 80);
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(10, 10, 180, 80);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '12px Arial';
+            ctx.fillText(`检测: ${vehicles.length}`, 20, 30);
+            ctx.fillText(`跟踪: ${vehicles.length}`, 20, 50);
+            ctx.fillText(`计数: ${totalCount}`, 20, 70);
+            
+            // 右侧 FPS
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(610, 10, 80, 40);
+            ctx.strokeStyle = '#ff8800';
+            ctx.strokeRect(610, 10, 80, 40);
+            ctx.fillStyle = '#ff8800';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText(`${currentFps} FPS`, 620, 35);
+            
+            // 模式标签
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(610, 55, 80, 25);
+            ctx.fillStyle = sceneMode === 'day' ? '#f1c40f' : sceneMode === 'night' ? '#3498db' : '#95a5a6';
+            ctx.font = '12px Arial';
+            ctx.fillText(sceneMode === 'day' ? '☀️ 白天' : sceneMode === 'night' ? '🌙 夜晚' : '🌧️ 雨天', 620, 72);
+        }
+        
+        function drawDemo() {
+            // 清空画布
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制场景
+            drawScene();
+            
+            // 绘制道路
+            drawRoad();
+            
+            // 绘制检测线
+            drawDetectionLine();
+            
+            // 更新和绘制车辆
             vehicles.forEach(v => {
-                v.x += v.speed * 0.05;
-                if (v.x > canvas.width + 100) v.x = -100;
-
-                // Draw vehicle box
-                ctx.strokeStyle = v.color;
-                ctx.lineWidth = 2;
-                ctx.strokeRect(v.x - 30, v.y - 20, 60, 40);
-
-                // Fill
-                ctx.fillStyle = v.color + '33';
-                ctx.fillRect(v.x - 30, v.y - 20, 60, 40);
-
-                // Draw ID
-                ctx.fillStyle = v.color;
-                ctx.font = 'bold 14px Arial';
-                ctx.fillText(`ID:${v.id}`, v.x - 15, v.y - 25);
-
-                // Draw speed
-                ctx.fillStyle = '#fff';
-                ctx.font = '12px Arial';
-                ctx.fillText(`${v.speed} km/h`, v.x - 20, v.y + 50);
-
-                // Draw type
-                ctx.fillStyle = v.color;
-                ctx.fillText(v.type, v.x - 15, v.y - 5);
+                // 移动
+                v.x += v.speed * 0.05 * v.dir;
+                
+                // 边界重置
+                if (v.dir > 0 && v.x > 850) {
+                    v.x = -80;
+                    v.id = (v.id + 10) % 100;
+                    v.type = ['car', 'car', 'car', 'truck', 'bus', 'motorcycle'][Math.floor(Math.random() * 6)];
+                    v.speed = 40 + Math.floor(Math.random() * 50);
+                }
+                if (v.dir < 0 && v.x < -50) {
+                    v.x = 850;
+                    v.id = (v.id + 10) % 100;
+                    v.type = ['car', 'car', 'car', 'truck', 'bus', 'motorcycle'][Math.floor(Math.random() * 6)];
+                    v.speed = 40 + Math.floor(Math.random() * 50);
+                }
+                
+                // 检测跨线
+                if ((v.dir > 0 && v.x > 395 && v.x < 405) || (v.dir < 0 && v.x < 405 && v.x > 395)) {
+                    totalCount++;
+                    const dir = v.dir > 0 ? '→' : '←';
+                    const msg = `ID:#${v.id} ${v.type} ${dir} 计数+1`;
+                    logMessages.unshift(msg);
+                    if (logMessages.length > 10) logMessages.pop();
+                }
+                
+                // 绘制车辆
+                drawVehicle(v);
             });
-
-            // FPS calculation
+            
+            // 绘制统计
+            drawStats();
+            
+            // FPS 计算
             frameCount++;
             const now = performance.now();
             if (now - lastTime >= 1000) {
@@ -821,27 +1216,24 @@
                 frameCount = 0;
                 lastTime = now;
             }
-
-            // Update stats
+            
+            // 更新 HTML 统计
             document.getElementById('vehicleCount').textContent = vehicles.length;
             document.getElementById('trackCount').textContent = vehicles.length;
             document.getElementById('speedValue').textContent = Math.round(vehicles.reduce((a, b) => a + b.speed, 0) / vehicles.length);
             document.getElementById('fpsDemo').textContent = currentFps;
-
-            // Add log message
-            if (Math.random() < 0.1) {
-                const v = vehicles[Math.floor(Math.random() * vehicles.length)];
-                const msg = `[${new Date().toLocaleTimeString()}] ID:${v.id} ${v.type} @ ${v.speed} km/h`;
-                logMessages.unshift(msg);
-                if (logMessages.length > 15) logMessages.pop();
-
+            
+            // 更新日志
+            if (logMessages.length > 0) {
                 const logPanel = document.getElementById('logPanel');
-                logPanel.innerHTML = logMessages.map(m => `<div style="color: #00ff88">${m}</div>`).join('');
+                logPanel.innerHTML = logMessages.map((m, i) => 
+                    `<div style="color: ${i === 0 ? '#00ff88' : '#888'}; font-size: 11px; padding: 2px 0;">${m}</div>`
+                ).join('');
             }
-
+            
             requestAnimationFrame(drawDemo);
         }
-
+        
         drawDemo();
 
         // ========== Chart Drawing ==========
