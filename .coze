@@ -1,0 +1,13 @@
+[project]
+requires = ["python-3.13"]
+project_type = ""
+
+[preview]
+preview_enable = "disabled"
+
+[deploy]
+build = ["bash", "vehicle_detection_system/install.sh"]
+run = ["bash", "vehicle_detection_system/run.sh"]
+
+[subprojects]
+path = ["vehicle_detection_system"]

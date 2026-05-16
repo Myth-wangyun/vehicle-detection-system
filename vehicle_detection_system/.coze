@@ -1,0 +1,12 @@
+[project]
+sub_id = "5ba84a93"
+name = "vehicle_detection_system"
+requires = ["python-3.13"]
+project_type = ""
+
+[preview]
+preview_enable = "disabled"
+
+[deploy]
+build = ["bash", "install.sh"]
+run = ["bash", "run.sh"]
