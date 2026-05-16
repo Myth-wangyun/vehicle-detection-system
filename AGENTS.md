@@ -58,6 +58,16 @@ vehicle_detection_system/
 - **prepare_dataset.py**: 数据集下载和格式转换
 
 ## 运行与预览
+
+### 预览链路（Web 预览）
+- **预览页面**: `preview.html` - 炫酷可视化展示页面
+- **预览服务**: Python HTTP 服务器，端口 5000
+- **预览脚本**: 
+  - `scripts/coze-preview-build.sh` - 预览准备
+  - `scripts/coze-preview-run.sh` - 启动预览服务
+- **访问地址**: http://localhost:5000/preview.html
+
+### 本地运行
 ```bash
 # 安装依赖
 bash install.sh

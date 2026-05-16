@@ -1,9 +1,13 @@
 [project]
 requires = ["python-3.13"]
-project_type = ""
+project_type = "web"
 
 [preview]
-preview_enable = "disabled"
+preview_enable = "enabled"
+
+[dev]
+build = ["bash", "vehicle_detection_system/scripts/coze-preview-build.sh"]
+run = ["bash", "vehicle_detection_system/scripts/coze-preview-run.sh"]
 
 [deploy]
 build = ["bash", "vehicle_detection_system/install.sh"]
