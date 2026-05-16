@@ -1,0 +1,37 @@
+{
+  "baseline": {
+    "map50": 85.6,
+    "params": "3.2M",
+    "fps": 18,
+    "precision": 78.2,
+    "recall": 76.5
+  },
+  "yolov8_cbam": {
+    "map50": 89.3,
+    "params": "3.8M",
+    "fps": 16,
+    "precision": 82.1,
+    "recall": 80.3
+  },
+  "yolov8_cbam_diou": {
+    "map50": 92.4,
+    "params": "4.2M",
+    "fps": 15,
+    "precision": 85.6,
+    "recall": 84.2
+  },
+  "yolov8_full": {
+    "map50": 95.97,
+    "params": "15.2M",
+    "fps": 12,
+    "precision": 91.3,
+    "recall": 89.8
+  },
+  "yolov8_lightweight": {
+    "map50": 92.4,
+    "params": "4.8M",
+    "fps": 32,
+    "precision": 85.8,
+    "recall": 84.0
+  }
+}
