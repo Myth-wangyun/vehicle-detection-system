@@ -3,7 +3,7 @@
 基于改进YOLOv8算法
 """
 __version__ = "1.0.0"
-__author__ = "齐鲁工业大学"
+__author__ = "Wang Yun"
 
 from .models.cbam import CBAM, CBAMBlock, ChannelAttention, SpatialAttention
 from .models.diou_loss import DIoULoss, YOLOv8Loss
